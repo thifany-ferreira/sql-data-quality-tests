@@ -1,0 +1,43 @@
+name: Qualidade de dados
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  dados:
+    name: Testes + relatório
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt ruff
+
+      - name: Lint
+        run: ruff check . && ruff format --check .
+
+      - name: Testes (regras de negócio + prova de eficácia)
+        run: pytest
+
+      - name: Relatório dos dados limpos (precisa passar)
+        run: python -m dq.report --dados limpos --saida reports/limpos.md
+
+      - name: Prova de eficácia (os dados com defeito precisam ser reprovados)
+        run: python -m dq.report --dados defeitos --expect-fail --saida reports/defeitos.md
+
+      - name: Publicar o relatório no resumo da execução
+        if: always()
+        run: cat reports/defeitos.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: relatorios-qualidade-de-dados
+          path: reports/
